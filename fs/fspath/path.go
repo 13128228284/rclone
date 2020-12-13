@@ -102,25 +102,37 @@ func Split(remote string) (parent string, leaf string, err error) {
 	return remoteName + parent, leaf, nil
 }
 
-// JoinRootPath joins any number of path elements into a single path, adding a
-// separating slash if necessary. The result is Cleaned; in particular,
-// all empty strings are ignored.
+// JoinRootPath joins filePath onto remote
 //
-// If the first non empty element has a leading "//" this is preserved.
+// If the remote has a leading "//" this is preserved, this is preserved
+// to allow Windows network path to be used in these remotes.
+//
+// If filePath is empty then remote will be returned.
 //
 // If the path contains \ these will be converted to / on Windows.
-func JoinRootPath(elem ...string) string {
-	es := make([]string, len(elem))
-	for i := range es {
-		es[i] = filepath.ToSlash(elem[i])
+func JoinRootPath(remote, filePath string) string {
+	remote = filepath.ToSlash(remote)
+	if filePath == "" {
+		return remote
 	}
-	for i, e := range es {
-		if e != "" {
-			if strings.HasPrefix(e, "//") {
-				return "/" + path.Clean(strings.Join(es[i:], "/"))
-			}
-			return path.Clean(strings.Join(es[i:], "/"))
+	filePath = filepath.ToSlash(filePath)
+
+	if strings.HasPrefix(remote, "//") {
+		return "/" + path.Join(remote, filePath)
+	}
+	remoteName, remotePath, err := Parse(remote)
+	if err != nil {
+		// Couldn't parse so assume it is a path
+		remoteName = ""
+		remotePath = remote
+	}
+	remotePath = path.Join(remotePath, filePath)
+	if remoteName != "" {
+		remoteName += ":"
+		// if have remote: then normalise the remotePath
+		if remotePath == "." {
+			remotePath = ""
 		}
 	}
-	return ""
+	return remoteName + remotePath
 }
